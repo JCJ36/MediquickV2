@@ -1,45 +1,83 @@
-import React, { useContext, useState } from "react";
+import React, { useState, useContext } from "react";
 import { ERPContext } from "../context/ERPContext";
-import { useNavigate } from "react-router-dom";
 
-export default function PaymentPage() {
-  const { selectedPharmacy } = useContext(ERPContext);
-  const navigate = useNavigate();
-  const [paymentMethod, setPaymentMethod] = useState("gcash");
+export default function StaffPage() {
+  const { orders, setOrders } = useContext(ERPContext);
 
-  const handlePayment = () => {
-    alert("Payment Successful!");
-    navigate("/my-orders");
+  const [patientName, setPatientName] = useState("");
+  const [medicine, setMedicine] = useState("");
+  const [price, setPrice] = useState("");
+  const [orderType, setOrderType] = useState("pickup");
+
+  const createOrder = () => {
+    if (!patientName || !medicine || !price) return;
+
+    const newOrder = {
+      id: Date.now(),
+      patientName,
+      medicine,
+      price,
+      orderType,
+      paymentStatus: "Unpaid",
+      status: "Waiting Payment",
+    };
+
+    setOrders([...orders, newOrder]);
+
+    setPatientName("");
+    setMedicine("");
+    setPrice("");
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Payment</h1>
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Staff - Create Prescription</h1>
 
-      <p className="mb-2">
-        Pharmacy: <strong>{selectedPharmacy?.name}</strong>
-      </p>
+      <input
+        className="border p-2 mr-2"
+        placeholder="Patient Name"
+        value={patientName}
+        onChange={(e) => setPatientName(e.target.value)}
+      />
 
-      <div className="mt-4">
-        <label className="block mb-2 font-semibold">Select Payment Method</label>
+      <input
+        className="border p-2 mr-2"
+        placeholder="Medicine"
+        value={medicine}
+        onChange={(e) => setMedicine(e.target.value)}
+      />
 
-        <select
-          className="border p-2 rounded w-full"
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-        >
-          <option value="gcash">GCash</option>
-          <option value="cod">Cash on Delivery</option>
-          <option value="card">Credit/Debit Card</option>
-        </select>
-      </div>
+      <input
+        className="border p-2 mr-2"
+        placeholder="Price"
+        type="number"
+        value={price}
+        onChange={(e) => setPrice(e.target.value)}
+      />
+
+      <select
+        className="border p-2 mr-2"
+        value={orderType}
+        onChange={(e) => setOrderType(e.target.value)}
+      >
+        <option value="pickup">Pickup</option>
+        <option value="delivery">Delivery</option>
+      </select>
 
       <button
-        onClick={handlePayment}
-        className="mt-6 bg-green-600 text-white px-6 py-2 rounded"
+        onClick={createOrder}
+        className="bg-blue-600 text-white px-4 py-2 rounded"
       >
-        Confirm Payment
+        Create Order
       </button>
+
+      <div className="mt-6">
+        {orders.map((order) => (
+          <div key={order.id} className="border p-2 mt-2">
+            {order.patientName} - {order.medicine} - ₱{order.price} - {order.paymentStatus}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

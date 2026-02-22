@@ -4,42 +4,32 @@ export const ERPContext = createContext();
 
 export function ERPProvider({ children }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [role, setRole] = useState(null); // admin | staff | user
+  const [userRole, setUserRole] = useState(null);
   const [currentPage, setCurrentPage] = useState("start");
-  const [orderType, setOrderType] = useState(null);
 
-  // Dummy login function (for testing roles)
+  const [orders, setOrders] = useState([]);
+
   const login = (username, password) => {
-    // ADMIN
     if (username === "admin" && password === "admin123") {
-      setRole("admin");
-      setIsLoggedIn(true);
+      setUserRole("admin");
       setCurrentPage("admin");
-      return true;
-    }
-
-    // STAFF
-    if (username === "staff" && password === "staff123") {
-      setRole("staff");
       setIsLoggedIn(true);
+    } else if (username === "staff" && password === "staff123") {
+      setUserRole("staff");
       setCurrentPage("staff");
-      return true;
-    }
-
-    // USER (patient)
-    if (username === "user" && password === "user123") {
-      setRole("user");
       setIsLoggedIn(true);
-      setCurrentPage("start");
-      return true;
+    } else if (username === "clerk" && password === "clerk123") {
+      setUserRole("clerk");
+      setCurrentPage("clerk");
+      setIsLoggedIn(true);
+    } else {
+      alert("Invalid credentials");
     }
-
-    return false;
   };
 
   const logout = () => {
     setIsLoggedIn(false);
-    setRole(null);
+    setUserRole(null);
     setCurrentPage("start");
   };
 
@@ -47,15 +37,13 @@ export function ERPProvider({ children }) {
     <ERPContext.Provider
       value={{
         isLoggedIn,
-        setIsLoggedIn,
-        role,
-        setRole,
+        userRole,
         currentPage,
         setCurrentPage,
-        orderType,
-        setOrderType,
         login,
         logout,
+        orders,
+        setOrders,
       }}
     >
       {children}
