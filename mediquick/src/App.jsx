@@ -4,9 +4,11 @@ import Sidebar from "./components/Sidebar";
 import StartPage from "./pages/StartPage";
 import OrderPage from "./pages/OrderPage";
 import AdminPage from "./pages/AdminPage";
-import StaffPage from "./pages/StaffPage";
 import ClerkPage from "./pages/ClerkPage";
 import Login from "./pages/Login";
+import DoctorPage from "./pages/DoctorPage";  
+import NursePage from "./pages/NursePAge";
+
 
 function App() {
   const { isLoggedIn, currentPage, userRole } = useContext(ERPContext);
@@ -20,9 +22,11 @@ function App() {
 
         {currentPage === "start" && <StartPage />}
         {currentPage === "order" && <OrderPage />}
+        {currentPage === "doctor" && <DoctorPage />}
 
         {userRole === "admin" && currentPage === "admin" && <AdminPage />}
-        {userRole === "staff" && currentPage === "staff" && <StaffPage />}
+        {userRole === "doctor" && currentPage === "doctor" && <DoctorPage />}
+        {userRole === "nurse" && currentPage === "nurse" && <NursePage />}  
         {userRole === "clerk" && currentPage === "clerk" && <ClerkPage />}
 
       </div>
