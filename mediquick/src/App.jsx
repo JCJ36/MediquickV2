@@ -1,13 +1,16 @@
 import React, { useContext } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { ERPContext } from "./context/ERPContext";
 import Sidebar from "./components/Sidebar";
+import Login from "./pages/Login";
 import StartPage from "./pages/StartPage";
 import OrderPage from "./pages/OrderPage";
-import Login from "./pages/Login";
-import AdminPage from "./pages/AdminPage";
+import MedicineSelectionPage from "./pages/MedicineSelectionPage";
+import PaymentPage from "./pages/Paymentpage";
+import AdminPage from "./pages/AdminPages/AdminPage";
 
 export default function App() {
-  const { isLoggedIn, currentPage } = useContext(ERPContext);
+  const { isLoggedIn, role } = useContext(ERPContext);
 
   if (!isLoggedIn) return <Login />;
 
@@ -15,9 +18,25 @@ export default function App() {
     <div className="flex">
       <Sidebar />
       <div className="flex-1 bg-gray-100 min-h-screen p-8">
-        {currentPage === "start" && <StartPage />}
-        {currentPage === "order" && <OrderPage />}
-        {currentPage === "admin" && <AdminPage />}
+        <Routes>
+          {/* User Routes */}
+          {role === "user" && (
+            <>
+              <Route path="/" element={<StartPage />} />
+              <Route path="/order" element={<OrderPage />} />
+              <Route path="/order/medicines" element={<MedicineSelectionPage />} />
+              <Route path="/payment" element={<PaymentPage />} />
+            </>
+          )}
+
+          {/* Admin Routes */}
+          {(role === "admin" || role === "staff") && (
+            <Route path="/admin" element={<AdminPage />} />
+          )}
+
+          {/* Catch-all redirect */}
+          <Route path="*" element={<Navigate to={role === "user" ? "/" : "/admin"} />} />
+        </Routes>
       </div>
     </div>
   );

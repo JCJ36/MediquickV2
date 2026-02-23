@@ -1,5 +1,6 @@
 import React, { useState, useContext } from "react";
 import { ERPContext } from "../context/ERPContext";
+import { useNavigate } from "react-router-dom";
 
 export default function Login() {
   const { login } = useContext(ERPContext);
@@ -7,10 +8,13 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
+  const navigate = useNavigate();
   const handleLogin = (e) => {
     e.preventDefault();
-
+    if (username === "user" && password === "user123") {
+      login("user");
+      navigate("/"); // Go to start page
+    }
     const success = login(username, password);
 
     if (!success) {

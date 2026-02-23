@@ -1,230 +1,178 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useMemo } from "react";
 import { ERPContext } from "../context/ERPContext";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useNavigate } from "react-router-dom"; // Assuming you use react-router
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// Fix Leaflet marker icons
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "/leaflet/marker-icon-2x.png",
-  iconUrl: "/leaflet/marker-icon.png",
-  shadowUrl: "/leaflet/marker-shadow.png",
+
+// --- Icons ---
+const userIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
 });
 
+const pharmIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+});
+
+const selectedIcon = new L.Icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
+  iconSize: [30, 45], iconAnchor: [15, 45], popupAnchor: [1, -34], shadowSize: [41, 41]
+});
+
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+function MapController({ target }) {
+  const map = useMap();
+  useEffect(() => {
+    if (target) map.flyTo(target, 16, { duration: 1.5 });
+  }, [target, map]);
+  return null;
+}
+
 export default function OrderPage() {
-  const { orderType } = useContext(ERPContext);
+  const { orderType, setConfirmedPharmacy } = useContext(ERPContext);
+  const navigate = useNavigate();
 
   const [userLocation, setUserLocation] = useState(null);
   const [pharmacies, setPharmacies] = useState([]);
-  const [selectedPharmacy, setSelectedPharmacy] = useState(null);
-  const [confirmedPharmacy, setConfirmedPharmacy] = useState(null);
-  const [orderPlaced, setOrderPlaced] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
 
-  const [medicines] = useState([
-    { id: 1, name: "Paracetamol", img: "/images/paracetamol.png", controlled: false },
-    { id: 2, name: "Amoxicillin", img: "/images/amoxicillin.png", controlled: false },
-    { id: 3, name: "Ibuprofen", img: "/images/ibuprofen.png", controlled: false },
-    { id: 4, name: "Ephedrine", img: "/images/ephedrine.png", controlled: true },
-  ]);
-  const [selectedMedicines, setSelectedMedicines] = useState([]);
-  const [prescription, setPrescription] = useState(null);
-  const [paymentDone, setPaymentDone] = useState(false);
-
-  // Get user location
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation([position.coords.latitude, position.coords.longitude]);
-      },
-      () => {
-        alert("Unable to get your location");
-      }
+      (pos) => setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => alert("Unable to get your location")
     );
   }, []);
 
-  // Fetch nearby pharmacies
   useEffect(() => {
-    if (!userLocation) return;
-    fetchNearbyPharmacies(userLocation[0], userLocation[1]);
+    if (userLocation) {
+      const fetchPharmacies = async () => {
+        setLoading(true);
+        const query = `[out:json];(node["amenity" = "pharmacy"](around:5000,${userLocation.lat},${userLocation.lng});way["amenity" = "pharmacy"](around:5000,${userLocation.lat},${userLocation.lng}););out center;`;
+        try {
+          const response = await fetch("https://overpass-api.de/api/interpreter", { method: "POST", body: query });
+          const data = await response.json();
+          setPharmacies(data.elements || []);
+        } catch (err) {
+          console.error("Overpass error:", err);
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchPharmacies();
+    }
   }, [userLocation]);
 
-  const fetchNearbyPharmacies = async (lat, lon) => {
-    try {
-      setLoading(true);
-      setError(null);
+  const sortedPharmacies = useMemo(() => {
+    if (!userLocation) return pharmacies;
+    return [...pharmacies].map(p => ({
+      ...p,
+      distance: calculateDistance(userLocation.lat, userLocation.lng, p.lat || p.center.lat, p.lon || p.center.lon)
+    })).sort((a, b) => a.distance - b.distance);
+  }, [pharmacies, userLocation]);
 
-      const query = `
-        [out:json];
-        node["amenity"="pharmacy"](around:1000,${lat},${lon});
-        out;
-      `;
-
-      const response = await fetch("https://overpass.kumi.systems/api/interpreter", {
-        method: "POST",
-        body: query,
-      });
-
-      const text = await response.text();
-      if (text.startsWith("<?xml")) throw new Error("Overpass API timeout");
-
-      const data = JSON.parse(text);
-      const results = data.elements.map((el) => ({
-        id: el.id,
-        name: el.tags?.name || "Unnamed Pharmacy",
-        lat: el.lat,
-        lon: el.lon,
-      }));
-
-      setPharmacies(results.slice(0, 10));
-      setLoading(false);
-    } catch (err) {
-      console.error("Overpass error:", err);
-      setError("Could not load pharmacies. Please try again.");
-      setLoading(false);
-    }
-  };
+  const selectedPharmacy = pharmacies.find(p => p.id === selectedId);
+  const mapTarget = selectedPharmacy ? [selectedPharmacy.lat || selectedPharmacy.center.lat, selectedPharmacy.lon || selectedPharmacy.center.lon] : null;
 
   const handleConfirmPharmacy = () => {
     if (!selectedPharmacy) return;
-    setConfirmedPharmacy(selectedPharmacy);
-    setSelectedPharmacy(null);
+    setConfirmedPharmacy({ 
+      id: selectedPharmacy.id, 
+      name: selectedPharmacy.tags?.name || "Unnamed Pharmacy" 
+    });
+    // Navigate to the new Medicine Selection Page
+    navigate("/order/medicines"); 
   };
 
-  const toggleMedicine = (med) => {
-    const alreadySelected = selectedMedicines.find((m) => m.id === med.id);
-    if (alreadySelected) {
-      setSelectedMedicines(selectedMedicines.filter((m) => m.id !== med.id));
-    } else {
-      setSelectedMedicines([...selectedMedicines, med]);
-    }
-  };
-
-  const requiresPrescription = selectedMedicines.some((m) => m.controlled);
-
-  const handleUploadPrescription = (e) => {
-    setPrescription(e.target.files[0]);
-  };
-
-  const handlePlaceOrder = () => {
-    if (requiresPrescription && !prescription) {
-      alert("Prescription required for controlled medicine!");
-      return;
-    }
-    setOrderPlaced(true);
-  };
-
-  if (!userLocation) return <div className="text-center mt-10">Getting your location...</div>;
+  if (!userLocation) return <div className="text-center mt-10">Initializing map...</div>;
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">
-        {orderType === "delivery" ? "Delivery Order" : "Pickup Order - Select Pharmacy"}
-      </h1>
-
-      {loading && <p>Loading pharmacies...</p>}
-      {error && <p className="text-red-500">{error}</p>}
-
-      {/* MAP */}
-      {!confirmedPharmacy && (
-        <MapContainer center={userLocation} zoom={15} style={{ height: "500px", width: "100%" }}>
-          <TileLayer
-            attribution="© OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={userLocation}>
-            <Popup>You are here</Popup>
-          </Marker>
-          {pharmacies.map((pharmacy) => (
-            <Marker
-              key={pharmacy.id}
-              position={[pharmacy.lat, pharmacy.lon]}
-              eventHandlers={{ click: () => setSelectedPharmacy(pharmacy) }}
-            >
-              <Popup>{pharmacy.name}</Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-      )}
-
-      {/* SELECTED PHARMACY */}
-      {selectedPharmacy && !confirmedPharmacy && (
-        <div className="mt-4 p-4 bg-white shadow rounded">
-          <h2 className="text-lg font-semibold">Selected: {selectedPharmacy.name}</h2>
-          <button
-            className="mt-2 bg-blue-600 text-white px-4 py-2 rounded"
-            onClick={handleConfirmPharmacy}
+    <div className="max-w-6xl mx-auto p-4 font-sans">
+      {/* UPDATED HEADER WITH BACK BUTTON */}
+      <div className="bg-gray-100 p-4 border border-b-0 rounded-t-lg flex justify-between items-center">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => navigate("/")} 
+            className="flex items-center text-gray-600 hover:text-blue-600 transition-colors font-medium text-sm"
           >
-            Confirm Pharmacy
+            <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back
           </button>
+          <h1 className="text-xl font-bold">
+            {orderType === "delivery" ? "Delivery Order" : "Pickup Order"}
+          </h1>
         </div>
-      )}
+        
+        {/* Optional: Indicator showing current search area */}
+        <span className="text-xs bg-white px-3 py-1 rounded-full border text-gray-500">
+          Searching within 5km
+        </span>
+      </div>
 
-      {/* MEDICINES */}
-      {confirmedPharmacy && !orderPlaced && (
-        <div className="mt-6 p-6 bg-green-50 border rounded text-center">
-          <h2 className="text-xl font-semibold mb-4">
-            Ordering from: {confirmedPharmacy.name}
-          </h2>
+      <div className="flex flex-col md:flex-row h-150 border rounded-b-lg overflow-hidden bg-white shadow-lg">
+        <div className="flex-1 relative">
+          <MapContainer center={[userLocation.lat, userLocation.lng]} zoom={14} style={{ height: "100%", width: "100%" }}>
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
+            <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
+              <Popup>You are here</Popup>
+            </Marker>
+            {pharmacies.map((p) => {
+              const pos = [p.lat || p.center.lat, p.lon || p.center.lon];
+              return (
+                <Marker 
+                  key={p.id} 
+                  position={pos} 
+                  icon={selectedId === p.id ? selectedIcon : pharmIcon}
+                  eventHandlers={{ click: () => setSelectedId(p.id) }}
+                >
+                  <Popup><strong>{p.tags?.name || "Pharmacy"}</strong></Popup>
+                </Marker>
+              );
+            })}
+            <MapController target={mapTarget} />
+          </MapContainer>
+        </div>
 
-          <p className="mb-3">Select medicines:</p>
-          <div className="flex flex-wrap justify-center gap-4 mb-4">
-            {medicines.map((med) => (
-              <div
-                key={med.id}
-                className={`border rounded-lg p-2 cursor-pointer ${
-                  selectedMedicines.includes(med) ? "border-green-600" : "border-gray-300"
-                }`}
-                onClick={() => toggleMedicine(med)}
+        <div className="w-full md:w-80 flex flex-col border-l bg-white">
+          <div className="flex-1 overflow-y-auto">
+            {loading ? <p className="p-4 text-center">Loading...</p> : sortedPharmacies.map((p) => (
+              <div 
+                key={p.id}
+                onClick={() => setSelectedId(p.id)}
+                className={`p-4 border-b cursor-pointer transition-colors ${selectedId === p.id ? "bg-blue-50 border-l-4 border-l-red-500" : "hover:bg-gray-50 border-l-4 border-l-transparent"}`}
               >
-                <img src={med.img} alt={med.name} className="w-36 h-36 object-cover rounded" />
-                <p className="mt-1 font-medium">{med.name}</p>
+                <div className="flex justify-between">
+                  <span className="font-semibold text-gray-800">{p.tags?.name || "Local Pharmacy"}</span>
+                  <span className="text-xs text-green-600 font-bold">{p.distance.toFixed(1)} km</span>
+                </div>
+                {selectedId === p.id && (
+                  <button onClick={handleConfirmPharmacy} className="mt-3 w-full bg-red-500 text-white text-xs py-2 rounded font-bold uppercase">
+                    Select This Pharmacy
+                  </button>
+                )}
               </div>
             ))}
           </div>
-
-          {/* Prescription upload */}
-          {requiresPrescription && (
-            <div className="mb-4">
-              <label className="block mb-1 font-medium">Upload Prescription (required):</label>
-              <input type="file" accept=".pdf,.jpg,.png" onChange={handleUploadPrescription} />
-            </div>
-          )}
-
-          {/* Place Order Button */}
-          <button
-            onClick={handlePlaceOrder}
-            className="bg-green-600 text-white px-6 py-2 rounded"
-          >
-            Place Order
-          </button>
         </div>
-      )}
-
-      {/* ORDER PLACED + MOCK PAYMENT */}
-      {orderPlaced && (
-        <div className="mt-6 p-6 bg-blue-50 border rounded text-center">
-          <h2 className="text-xl font-semibold mb-2">Order Sent to {confirmedPharmacy.name}</h2>
-
-          <p className="mt-2 mb-4">Please wait for pharmacy confirmation.</p>
-
-          <div>
-            <p className="mb-2">Payment:</p>
-            {!paymentDone ? (
-              <button
-                className="bg-yellow-500 px-6 py-2 rounded text-white"
-                onClick={() => setPaymentDone(true)}
-              >
-                Pay Now
-              </button>
-            ) : (
-              <p className="text-green-600 font-semibold">Payment completed!</p>
-            )}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

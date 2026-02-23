@@ -1,8 +1,4 @@
-import React, { useContext } from "react";
-import { ERPContext } from "../context/ERPContext";
-
 export default function AdminPage() {
-  const { logout } = useContext(ERPContext);
 
   return (
     <div className="bg-white p-6 rounded shadow">
@@ -24,13 +20,6 @@ export default function AdminPage() {
           <p className="text-2xl">4</p>
         </div>
       </div>
-
-      <button
-        onClick={logout}
-        className="bg-red-500 text-white px-4 py-2 rounded"
-      >
-        Logout
-      </button>
     </div>
   );
 }

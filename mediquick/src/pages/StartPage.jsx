@@ -1,9 +1,10 @@
 import React, { useContext } from "react";
 import { ERPContext } from "../context/ERPContext";
+import { useNavigate } from "react-router-dom";
 
 export default function StartPage() {
   const { setOrderType, setCurrentPage } = useContext(ERPContext);
-
+  const navigate = useNavigate();
   return (
     <div className="text-center">
       <h1 className="text-3xl font-bold mb-8">
@@ -15,7 +16,7 @@ export default function StartPage() {
           className="bg-green-500 text-white px-6 py-3 rounded"
           onClick={() => {
             setOrderType("delivery");
-            setCurrentPage("order");
+            navigate("/order"); // Go to map
           }}
         >
           Delivery
@@ -25,7 +26,7 @@ export default function StartPage() {
           className="bg-blue-500 text-white px-6 py-3 rounded"
           onClick={() => {
             setOrderType("pickup");
-            setCurrentPage("order");
+            navigate("/order"); // Go to map
           }}
         >
           Pick Up
