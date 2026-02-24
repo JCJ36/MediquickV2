@@ -45,13 +45,17 @@ function MapController({ target }) {
 }
 
 export default function OrderPage() {
-  const { orderType, setConfirmedPharmacy } = useContext(ERPContext);
+  // const { orderType, setConfirmedPharmacy } = useContext(ERPContext);\
+  const { orderType, userLocation, fetchLocation, setConfirmedPharmacy } = useContext(ERPContext);
   const navigate = useNavigate();
 
-  const [userLocation, setUserLocation] = useState(null);
   const [pharmacies, setPharmacies] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetchLocation();
+  }, []);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -129,7 +133,12 @@ export default function OrderPage() {
 
       <div className="flex flex-col md:flex-row h-150 border rounded-b-lg overflow-hidden bg-white shadow-lg">
         <div className="flex-1 relative">
-          <MapContainer center={[userLocation.lat, userLocation.lng]} zoom={14} style={{ height: "100%", width: "100%" }}>
+          <MapContainer 
+            key={`${userLocation.lat}-${userLocation.lng}`} 
+            center={[userLocation.lat, userLocation.lng]} 
+            zoom={14} 
+            className="h-full w-full"
+          >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap" />
             <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
               <Popup>You are here</Popup>

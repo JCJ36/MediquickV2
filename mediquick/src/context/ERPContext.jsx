@@ -72,6 +72,23 @@ export function ERPProvider({ children }) {
   const [role, setRole] = useState(null); 
   const [orderType, setOrderType] = useState(null);
   const [confirmedPharmacy, setConfirmedPharmacy] = useState(null); // Added this
+  const [userLocation, setUserLocation] = useState(null);
+
+const fetchLocation = () => {
+  // Only fetch if we don't have it yet to save battery/resources
+  if (userLocation) return; 
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+    },
+    (err) => {
+      console.error("Location error:", err);
+      alert("Please enable location services.");
+    },
+    { enableHighAccuracy: true, timeout: 5000 } 
+  );
+};
 
   const login = (roleType) => {
     setRole(roleType);
@@ -95,6 +112,8 @@ export function ERPProvider({ children }) {
         setConfirmedPharmacy,
         login,
         logout,
+        userLocation, 
+        fetchLocation,
       }}
     >
       {children}
